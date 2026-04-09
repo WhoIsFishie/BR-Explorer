@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Index</title>
+  <style>
+    body { font-family: sans-serif; background: #111; color: #eee; }
+    button { margin-bottom: 10px; padding: 6px 12px; cursor: pointer; }
+    a { color: #8cf; text-decoration: none; }
+    li { margin: 4px 0; }
+    .status { font-size: 12px; opacity: 0.7; margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+
+<h1>Files</h1>
+<button id="reload">Reload</button>
+<div class="status" id="status">Loading...</div>
+<ul id="list"></ul>
+
+<script>
+const owner = "WhoIsFishie";
+const repo = "BR-Explorer";
+const baseUrl = `https://${owner}.github.io/${repo}/`;
+
+const CACHE_KEY = "gh_files_cache";
+const CACHE_TIME_KEY = "gh_files_cache_time";
+const TTL = 24 * 60 * 60 * 1000; // 1 day
+
+const statusEl = document.getElementById("status");
+const listEl = document.getElementById("list");
+
+function setStatus(msg) {
+  statusEl.textContent = msg;
+}
+
+function render(files) {
+  listEl.innerHTML = "";
+  files.forEach(path => {
+    const li = document.createElement("li");
+    li.innerHTML = `<a href="${baseUrl + path}">${path}</a>`;
+    listEl.appendChild(li);
+  });
+}
+
+async function fetchFiles(path = "") {
+  const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`);
+  const files = await res.json();
+
+  let results = [];
+
+  for (const file of files) {
+    if (file.type === "file" && file.name.endsWith(".html")) {
+      results.push(file.path);
+    } else if (file.type === "dir") {
+      const sub = await fetchFiles(file.path);
+      results = results.concat(sub);
+    }
+  }
+
+  return results;
+}
+
+async function load(forceRefresh = false) {
+  const now = Date.now();
+  const cached = localStorage.getItem(CACHE_KEY);
+  const cacheTime = localStorage.getItem(CACHE_TIME_KEY);
+
+  if (!forceRefresh && cached && cacheTime && (now - cacheTime < TTL)) {
+    setStatus("Loaded from cache");
+    render(JSON.parse(cached));
+    return;
+  }
+
+  try {
+    setStatus("Fetching from GitHub...");
+    const files = await fetchFiles();
+
+    localStorage.setItem(CACHE_KEY, JSON.stringify(files));
+    localStorage.setItem(CACHE_TIME_KEY, now.toString());
+
+    setStatus("Fresh data loaded");
+    render(files);
+  } catch (err) {
+    console.error(err);
+
+    if (cached) {
+      setStatus("Error fetching. Showing cached data.");
+      render(JSON.parse(cached));
+    } else {
+      setStatus("Failed to load data.");
+    }
+  }
+}
+
+// Reload button (force refresh)
+document.getElementById("reload").onclick = () => {
+  load(true);
+};
+
+// Initial load
+load();
+</script>
+
+</body>
+</html>
