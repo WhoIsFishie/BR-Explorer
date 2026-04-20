@@ -1,5 +1,3 @@
----
----
 <!DOCTYPE html>
 <html>
 <body>
@@ -11,7 +9,7 @@
   {% for file in files %}
     {% if file.extname == ".html" and file.name != "index.html" %}
       <li>
-        <a href="{{ file.path }}">{{ file.path }}</a>
+        <a href="{{ site.baseurl }}{{ file.path }}">{{ file.path }}</a>
       </li>
     {% endif %}
   {% endfor %}
